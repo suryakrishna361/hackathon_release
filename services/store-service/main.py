@@ -4,6 +4,7 @@ import requests
 from collections import deque
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -47,7 +48,13 @@ PRODUCTS = [
 
 
 # ── Routes ──
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
+def store_ui():
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(html_path, encoding="utf-8") as f:
+        return f.read()
+
+@app.get("/api/info")
 def root():
     return {"service": "store-service", "version": "v1", "status": "running"}
 
