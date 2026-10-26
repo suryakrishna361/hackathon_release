@@ -1,0 +1,19 @@
+version: "3.9"
+
+# Runs the v2 candidate alongside the stable stack.
+# Stable payment-service stays on port 8001.
+# Candidate payment-service runs on port 8002.
+# Agents compare both without touching real traffic.
+
+services:
+  payment-service-candidate:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile.v2
+    container_name: payment-service-candidate
+    ports:
+      - "8002:8001"
+    environment:
+      # Note: v2 reads PAYMENT_TIMEOUT (wrong key) — this has no effect
+      - PAYMENT_TIMEOUT_MS=500
+    restart: unless-stopped
