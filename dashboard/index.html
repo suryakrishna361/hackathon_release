@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Release Guardian</title>
+<style>
+  :root {
+    --bg:#0d1117; --surface:#161b22; --border:#30363d;
+    --fg:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+    --green:#3fb950; --yellow:#d29922; --red:#f85149; --orange:#fb8500;
+    --font:'Courier New',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px}
+
+  header{
+    background:var(--surface);border-bottom:1px solid var(--border);
+    padding:14px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  }
+  header h1{font-size:18px;color:var(--accent);letter-spacing:.05em;flex:1}
+  .badge{
+    padding:3px 10px;border-radius:12px;font-size:11px;font-weight:bold;
+    text-transform:uppercase;letter-spacing:.08em;
+  }
+  .badge-idle   {background:var(--border);color:var(--muted)}
+  .badge-running{background:#1c3a5e;color:var(--accent);animation:pulse 1.2s infinite}
+  .badge-ok     {background:#0d2b1a;color:var(--green)}
+  .badge-warn   {background:#2d2008;color:var(--yellow)}
+  .badge-error  {background:#2d0e0e;color:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* poller pill */
+  .poller-pill{
+    display:flex;align-items:center;gap:6px;padding:4px 10px;
+    border-radius:12px;border:1px solid var(--border);font-size:11px;
+    cursor:pointer;background:var(--bg);color:var(--muted);
+  }
+  .poller-pill.active{border-color:var(--green);color:var(--green)}
+  .poller-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .poller-dot.blink{animation:pulse .8s infinite}
+
+  main{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 57px)}
+
+  /* Left panel */
+  .agents-panel{
+    background:var(--surface);border-right:1px solid var(--border);
+    overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;
+  }
+
+  .trigger-btn{
+    background:var(--accent);color:#0d1117;border:none;border-radius:6px;
+    padding:10px 16px;font-family:var(--font);font-size:13px;font-weight:bold;
+    cursor:pointer;width:100%;transition:opacity .15s;
+  }
+  .trigger-btn:hover{opacity:.85}
+  .trigger-btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-green{background:var(--green)}
+
+  /* section label */
+  .section-lbl{
+    font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;
+    padding:4px 2px 0;border-top:1px solid var(--border);margin-top:2px;
+  }
+
+  /* cards */
+  .agent-card{
+    border:1px solid var(--border);border-radius:8px;padding:11px 13px;
+    background:var(--bg);transition:border-color .3s,background .3s;
+  }
+  .agent-card.running {border-color:var(--accent);background:#0d1e33}
+  .agent-card.done-ok {border-color:var(--green); background:#0d1d12}
+  .agent-card.done-warn{border-color:var(--yellow);background:#1c1500}
+  .agent-card.done-err{border-color:var(--red);   background:#1c0c0c}
+
+  .card-title{font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+  .card-icon{font-size:14px}
+  .card-status{font-size:13px;color:var(--fg)}
+  .card-detail{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;word-break:break-word}
+  .card-link{font-size:10px;color:var(--accent);text-decoration:none;display:block;margin-top:3px}
+  .card-link:hover{text-decoration:underline}
+
+  /* Right panel */
+  .log-panel{display:flex;flex-direction:column;overflow:hidden}
+  .log-header{padding:10px 20px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .log-body{flex:1;overflow-y:auto;padding:10px 20px}
+  .log-entry{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid rgba(48,54,61,.4);align-items:flex-start}
+  .log-time {color:var(--muted);font-size:11px;white-space:nowrap;padding-top:1px}
+  .log-agent{color:var(--accent);font-size:11px;white-space:nowrap;min-width:90px;padding-top:1px}
+  .log-msg  {color:var(--fg);font-size:12px;line-height:1.5;word-break:break-word}
+  .log-msg.warn {color:var(--yellow)}
+  .log-msg.error{color:var(--red)}
+  .log-msg.ok   {color:var(--green)}
+
+  /* Metrics strip */
+  .metrics-strip{
+    display:flex;gap:14px;padding:10px 20px;background:var(--surface);
+    border-top:1px solid var(--border);flex-wrap:wrap;
+  }
+  .metric{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .metric-val{font-size:18px;font-weight:bold;color:var(--accent)}
+  .metric-val.warn{color:var(--yellow)}
+  .metric-val.bad {color:var(--red)}
+  .metric-val.good{color:var(--green)}
+  .metric-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+
+  /* Verdict banner */
+  .verdict{margin:8px 20px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:bold;display:none}
+  .verdict.remediated{display:block;background:#0d2b1a;color:var(--green);border:1px solid var(--green)}
+  .verdict.blocked   {display:block;background:#2d2008;color:var(--yellow);border:1px solid var(--yellow)}
+  .verdict.healthy   {display:block;background:#0d2b1a;color:var(--green);border:1px solid var(--green)}
+  .verdict.error     {display:block;background:#2d0e0e;color:var(--red);  border:1px solid var(--red)}
+
+  /* Pipeline flow diagram */
+  .flow{
+    display:flex;align-items:center;gap:0;padding:6px 20px;
+    background:var(--bg);border-bottom:1px solid var(--border);
+    font-size:10px;overflow-x:auto;flex-wrap:nowrap;
+  }
+  .flow-step{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:4px 8px;border-radius:4px;white-space:nowrap;
+    border:1px solid var(--border);background:var(--surface);color:var(--muted);
+    min-width:70px;text-align:center;transition:all .3s;
+  }
+  .flow-step.active{border-color:var(--accent);color:var(--accent);background:#0d1e33}
+  .flow-step.done  {border-color:var(--green); color:var(--green); background:#0d1d12}
+  .flow-step.fail  {border-color:var(--red);   color:var(--red);   background:#1c0c0c}
+  .flow-step.skip  {opacity:.3}
+  .flow-step .step-icon{font-size:14px}
+  .flow-step .step-lbl{font-size:9px;letter-spacing:.05em}
+  .flow-arrow{color:var(--border);font-size:16px;padding:0 2px;flex-shrink:0}
+  .flow-arrow.done{color:var(--green)}
+</style>
+</head>
+<body>
+<header>
+  <h1>&#x1F6E1; Release Guardian</h1>
+  <span class="badge badge-idle" id="pipeline-badge">IDLE</span>
+  <div class="poller-pill" id="poller-pill" onclick="togglePoller()" title="Auto-detect GitHub pushes">
+    <div class="poller-dot" id="poller-dot"></div>
+    <span id="poller-lbl">Poller: OFF</span>
+  </div>
+</header>
+
+<!-- Pipeline flow strip -->
+<div class="flow">
+  <div class="flow-step" id="flow-push"><div class="step-icon">⬆</div><div class="step-lbl">PUSH</div></div>
+  <div class="flow-arrow" id="arr-0">›</div>
+  <div class="flow-step" id="flow-gh"><div class="step-icon">⚙</div><div class="step-lbl">GH ACTIONS</div></div>
+  <div class="flow-arrow" id="arr-1">›</div>
+  <div class="flow-step" id="flow-a1"><div class="step-icon">🔍</div><div class="step-lbl">ANALYSIS</div></div>
+  <div class="flow-arrow" id="arr-2">›</div>
+  <div class="flow-step" id="flow-a2"><div class="step-icon">✅</div><div class="step-lbl">CI CHECK</div></div>
+  <div class="flow-arrow" id="arr-3">›</div>
+  <div class="flow-step" id="flow-docker"><div class="step-icon">🐳</div><div class="step-lbl">DOCKER</div></div>
+  <div class="flow-arrow" id="arr-4">›</div>
+  <div class="flow-step" id="flow-a3"><div class="step-icon">🧠</div><div class="step-lbl">DECISION</div></div>
+  <div class="flow-arrow" id="arr-5">›</div>
+  <div class="flow-step" id="flow-a4"><div class="step-icon">📡</div><div class="step-lbl">CANARY</div></div>
+  <div class="flow-arrow" id="arr-6">›</div>
+  <div class="flow-step" id="flow-a5"><div class="step-icon">🩺</div><div class="step-lbl">DIAGNOSE</div></div>
+  <div class="flow-arrow" id="arr-7">›</div>
+  <div class="flow-step" id="flow-a6"><div class="step-icon">🔄</div><div class="step-lbl">ROLLBACK</div></div>
+</div>
+
+<main>
+  <!-- Left: cards -->
+  <div class="agents-panel">
+    <button class="trigger-btn" id="trigger-btn" onclick="triggerPipeline()">&#9654; Run Live Pipeline</button>
+    <button class="trigger-btn btn-green" id="demo-btn" onclick="triggerDemo()">&#9654; Demo Replay (fast)</button>
+
+    <div class="section-lbl">📡 GitHub Actions CI</div>
+    <div class="agent-card" id="card-gh">
+      <div class="card-title"><span class="card-icon">⚙</span>GitHub Actions</div>
+      <div class="card-status" id="gh-status">Waiting…</div>
+      <div class="card-detail" id="gh-detail"></div>
+      <a class="card-link" id="gh-link" href="#" target="_blank" style="display:none">View run on GitHub ↗</a>
+    </div>
+
+    <div class="section-lbl">🤖 Agents</div>
+    <div class="agent-card" id="card-1">
+      <div class="card-title"><span class="card-icon">🔍</span>Agent 1 — Change Analysis</div>
+      <div class="card-status" id="a1-status">Waiting…</div>
+      <div class="card-detail" id="a1-detail"></div>
+    </div>
+    <div class="agent-card" id="card-2">
+      <div class="card-title"><span class="card-icon">✅</span>Agent 2 — CI Validation</div>
+      <div class="card-status" id="a2-status">Waiting…</div>
+      <div class="card-detail" id="a2-detail"></div>
+    </div>
+
+    <div class="section-lbl">🐳 Docker Build</div>
+    <div class="agent-card" id="card-docker">
+      <div class="card-title"><span class="card-icon">🐳</span>Docker Build &amp; Push</div>
+      <div class="card-status" id="docker-status">Waiting…</div>
+      <div class="card-detail" id="docker-detail"></div>
+    </div>
+
+    <div class="section-lbl">🧠 Decision &amp; Runtime</div>
+    <div class="agent-card" id="card-3">
+      <div class="card-title"><span class="card-icon">🧠</span>Agent 3 — Rollout Decision</div>
+      <div class="card-status" id="a3-status">Waiting…</div>
+      <div class="card-detail" id="a3-detail"></div>
+    </div>
+    <div class="agent-card" id="card-4">
+      <div class="card-title"><span class="card-icon">📡</span>Agent 4 — Runtime Monitor</div>
+      <div class="card-status" id="a4-status">Waiting…</div>
+      <div class="card-detail" id="a4-detail"></div>
+    </div>
+
+    <div class="section-lbl">🛡 Self-Healing</div>
+    <div class="agent-card" id="card-5">
+      <div class="card-title"><span class="card-icon">🩺</span>Agent 5 — Failure Diagnosis</div>
+      <div class="card-status" id="a5-status">Waiting…</div>
+      <div class="card-detail" id="a5-detail"></div>
+    </div>
+    <div class="agent-card" id="card-6">
+      <div class="card-title"><span class="card-icon">🔄</span>Agent 6 — Remediation</div>
+      <div class="card-status" id="a6-status">Waiting…</div>
+      <div class="card-detail" id="a6-detail"></div>
+    </div>
+  </div>
+
+  <!-- Right: log + metrics -->
+  <div class="log-panel">
+    <div class="log-header">Live Decision Log</div>
+    <div class="verdict" id="verdict"></div>
+    <div class="log-body" id="log-body"></div>
+    <div class="metrics-strip">
+      <div class="metric"><div class="metric-val" id="m-risk">—</div><div class="metric-lbl">Risk Level</div></div>
+      <div class="metric"><div class="metric-val" id="m-ci">—</div><div class="metric-lbl">GH Actions</div></div>
+      <div class="metric"><div class="metric-val" id="m-docker">—</div><div class="metric-lbl">Docker Build</div></div>
+      <div class="metric"><div class="metric-val" id="m-strategy">—</div><div class="metric-lbl">Strategy</div></div>
+      <div class="metric"><div class="metric-val" id="m-stable-err">—</div><div class="metric-lbl">Stable Err%</div></div>
+      <div class="metric"><div class="metric-val" id="m-cand-err">—</div><div class="metric-lbl">Cand Err%</div></div>
+      <div class="metric"><div class="metric-val" id="m-action">—</div><div class="metric-lbl">Action Taken</div></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const AGENT_NUM = {'Agent 1':1,'Agent 2':2,'Agent 3':3,'Agent 4':4,'Agent 5':5,'Agent 6':6};
+
+function agentNum(label){
+  for(const k of Object.keys(AGENT_NUM)) if(label.includes(k)) return AGENT_NUM[k];
+  return null;
+}
+function cardClass(id,state){ document.getElementById(id).className='agent-card '+state }
+function flowStep(id,state){
+  const el=document.getElementById('flow-'+id);
+  if(el) el.className='flow-step '+state;
+}
+function flowArrow(n,done){
+  const el=document.getElementById('arr-'+n);
+  if(el) el.className='flow-arrow'+(done?' done':'');
+}
+
+function addLog(time,agent,msg,level){
+  const body=document.getElementById('log-body');
+  const d=document.createElement('div');
+  d.className='log-entry';
+  d.innerHTML=`<span class="log-time">${time}</span><span class="log-agent">[${agent}]</span><span class="log-msg ${level||''}">${msg}</span>`;
+  body.appendChild(d);
+  body.scrollTop=body.scrollHeight;
+}
+
+function setBadge(text,cls){
+  const b=document.getElementById('pipeline-badge');
+  b.textContent=text; b.className='badge '+cls;
+}
+
+function setMetric(id,val,cls){
+  const el=document.getElementById(id);
+  el.textContent=val;
+  if(cls) el.className='metric-val '+cls;
+}
+
+function updateMetrics(ctx){
+  if(!ctx) return;
+  const risk=ctx.risk_level||'—';
+  setMetric('m-risk',risk.toUpperCase(),
+    risk==='critical'?'bad':risk==='high'?'warn':risk==='low'?'good':'');
+  setMetric('m-strategy',(ctx.rollout_strategy||'—').toUpperCase(),
+    ctx.rollout_strategy==='block'?'bad':ctx.promotion_allowed?'good':'warn');
+  setMetric('m-stable-err',ctx.stable_error_rate!=null?(ctx.stable_error_rate*100).toFixed(0)+'%':'—');
+  setMetric('m-cand-err',ctx.candidate_error_rate!=null?(ctx.candidate_error_rate*100).toFixed(0)+'%':'—',
+    ctx.candidate_error_rate>0.5?'bad':'');
+  setMetric('m-action',ctx.remediation_status||(ctx.recovery_verified?'RECOVERED':'—'),
+    ctx.recovery_verified?'good':ctx.remediation_status==='failed'?'bad':'');
+}
+
+function showVerdict(msg,cls){
+  const v=document.getElementById('verdict');
+  v.textContent=msg; v.className='verdict '+cls;
+}
+
+function resetAll(){
+  [1,2,3,4,5,6].forEach(n=>{
+    cardClass('card-'+n,'');
+    document.getElementById('a'+n+'-status').textContent='Waiting…';
+    document.getElementById('a'+n+'-detail').textContent='';
+  });
+  cardClass('card-gh',''); document.getElementById('gh-status').textContent='Waiting…';
+  document.getElementById('gh-detail').textContent='';
+  document.getElementById('gh-link').style.display='none';
+  cardClass('card-docker',''); document.getElementById('docker-status').textContent='Waiting…';
+  document.getElementById('docker-detail').textContent='';
+  setMetric('m-ci','—',''); setMetric('m-docker','—','');
+  setMetric('m-risk','—',''); setMetric('m-strategy','—','');
+  setMetric('m-stable-err','—',''); setMetric('m-cand-err','—',''); setMetric('m-action','—','');
+  document.getElementById('verdict').className='verdict';
+  ['push','gh','a1','a2','docker','a3','a4','a5','a6'].forEach(id=>flowStep(id,''));
+  [0,1,2,3,4,5,6,7].forEach(n=>flowArrow(n,false));
+}
+
+// ── SSE ──────────────────────────────────────────────────────────────────────
+const es=new EventSource('/events');
+
+es.onmessage=function(e){
+  const {event,data}=JSON.parse(e.data);
+  if(event==='heartbeat') return;
+
+  if(event==='connected'){
+    if(data.running) setBadge('RUNNING','badge-running');
+    if(data.context&&data.context.decision_log){
+      data.context.decision_log.forEach(entry=>{
+        addLog(entry.ts||'',entry.agent,entry.message,
+          entry.level==='warn'?'warn':entry.level==='error'?'error':'');
+      });
+      updateMetrics(data.context);
+    }
+    return;
+  }
+
+  if(event==='pipeline_start'){
+    setBadge('RUNNING','badge-running');
+    document.getElementById('trigger-btn').disabled=true;
+    document.getElementById('demo-btn').disabled=true;
+    resetAll();
+    flowStep('push','active'); flowStep('gh','active');
+    addLog(new Date().toLocaleTimeString(),'orchestrator','Pipeline started — waiting for GitHub Actions','');
+    return;
+  }
+
+  if(event==='agent_start'){
+    const n=agentNum(data.agent);
+    if(n){
+      cardClass('card-'+n,'running');
+      document.getElementById('a'+n+'-status').textContent='Running…';
+      const flowId=['','a1','a2','','a3','a4','a5','a6'][n]||'';
+      if(flowId) flowStep(flowId,'active');
+    }
+    addLog(new Date().toLocaleTimeString(),data.agent.substring(0,14),'Started','');
+    return;
+  }
+
+  if(event==='agent_done'){
+    const n=agentNum(data.agent);
+    const ctx=data.context||{};
+    updateMetrics(ctx);
+
+    if(n){
+      let state='done-ok',detail='';
+      if(n===1){
+        state=ctx.risk_level==='critical'?'done-err':ctx.risk_level==='high'?'done-warn':'done-ok';
+        detail=ctx.suspected_failure||'';
+        document.getElementById('a1-status').textContent='Risk: '+(ctx.risk_level||'?').toUpperCase();
+        flowStep('a1',state==='done-ok'?'done':'fail'); flowArrow(2,true);
+      } else if(n===2){
+        state=ctx.tests_passed?'done-ok':'done-warn';
+        const ghConclusion=ctx.github_actions_conclusion||'';
+        detail=ghConclusion?'GitHub Actions: '+ghConclusion:'';
+        if(ctx.validation_warnings&&ctx.validation_warnings.length)
+          detail+=(detail?'\n':'')+ctx.validation_warnings.slice(0,2).join('; ');
+        document.getElementById('a2-status').textContent=ctx.tests_passed?'✓ Tests passed':'⚠ Tests failed';
+        setMetric('m-ci',ctx.tests_passed?'PASS':'FAIL',ctx.tests_passed?'good':'bad');
+        flowStep('a2',ctx.tests_passed?'done':'fail'); flowArrow(3,true);
+
+        // Update GH Actions card from agent 2 context
+        if(ghConclusion){
+          const ghOk=ghConclusion==='success';
+          cardClass('card-gh',ghOk?'done-ok':'done-err');
+          document.getElementById('gh-status').textContent=ghOk?'✓ All tests passed':'✗ Tests failed';
+          document.getElementById('gh-detail').textContent='Conclusion: '+ghConclusion;
+          flowStep('gh',ghOk?'done':'fail'); flowArrow(1,true);
+          setMetric('m-ci',ghConclusion.toUpperCase(),ghOk?'good':'bad');
+        }
+      } else if(n===3){
+        state=ctx.promotion_allowed?'done-ok':'done-err';
+        detail=ctx.strategy_reasoning?ctx.strategy_reasoning.substring(0,120)+'…':'';
+        document.getElementById('a3-status').textContent=(ctx.rollout_strategy||'?').toUpperCase();
+        flowStep('a3',ctx.promotion_allowed?'done':'fail'); flowArrow(4,ctx.promotion_allowed);
+      } else if(n===4){
+        state=ctx.candidate_degrading?'done-err':'done-ok';
+        detail='Stable p95='+ctx.stable_p95_ms+'ms | Cand p95='+ctx.candidate_p95_ms+'ms';
+        document.getElementById('a4-status').textContent=ctx.candidate_degrading?'⚠ DEGRADING':'✓ Healthy';
+        flowStep('a4',ctx.candidate_degrading?'fail':'done'); flowArrow(5,ctx.candidate_degrading);
+      } else if(n===5){
+        state='done-warn';
+        detail=ctx.likely_cause||'';
+        document.getElementById('a5-status').textContent=ctx.recommended_action||'?';
+        flowStep('a5','done'); flowArrow(6,true);
+      } else if(n===6){
+        state=ctx.recovery_verified?'done-ok':'done-err';
+        detail=ctx.remediation_taken||'';
+        document.getElementById('a6-status').textContent=ctx.remediation_status||'?';
+        flowStep('a6',ctx.recovery_verified?'done':'fail');
+      }
+      cardClass('card-'+n,state);
+      document.getElementById('a'+n+'-detail').textContent=detail;
+    }
+
+    if(ctx.decision_log&&ctx.decision_log.length>0){
+      const last=ctx.decision_log[ctx.decision_log.length-1];
+      addLog(last.ts||new Date().toLocaleTimeString(),last.agent,last.message,
+        last.level==='warn'?'warn':last.level==='error'?'error':'ok');
+    }
+    return;
+  }
+
+  if(event==='docker_build_start'){
+    cardClass('card-docker','running');
+    document.getElementById('docker-status').textContent='Building image…';
+    document.getElementById('docker-detail').textContent='Service: '+data.service;
+    flowStep('docker','active');
+    addLog(new Date().toLocaleTimeString(),'docker','Building '+data.service+' candidate image','');
+    return;
+  }
+
+  if(event==='docker_build_done'){
+    const ok=data.pushed===true;
+    cardClass('card-docker',ok?'done-ok':'done-warn');
+    document.getElementById('docker-status').textContent=ok?'✓ Built & pushed to Docker Hub':'⚠ Build done (push skipped)';
+    document.getElementById('docker-detail').textContent=data.image||'';
+    setMetric('m-docker',ok?'PUSHED':'BUILT',ok?'good':'warn');
+    flowStep('docker','done'); flowArrow(4,true);
+    addLog(new Date().toLocaleTimeString(),'docker',(ok?'Pushed to Docker Hub: ':'Built: ')+(data.image||''),'ok');
+    return;
+  }
+
+  if(event==='agent_error'){
+    const n=agentNum(data.agent);
+    if(n){ cardClass('card-'+n,'done-err'); }
+    addLog(new Date().toLocaleTimeString(),data.agent.substring(0,14),'✗ '+data.error,'error');
+    return;
+  }
+
+  if(event==='pipeline_blocked'){
+    setBadge('BLOCKED','badge-warn');
+    showVerdict('🚫 Deployment Blocked — '+data.reason,'blocked');
+    document.getElementById('trigger-btn').disabled=false;
+    document.getElementById('demo-btn').disabled=false;
+    addLog(new Date().toLocaleTimeString(),'orchestrator','BLOCKED: '+data.reason,'warn');
+    return;
+  }
+
+  if(event==='pipeline_healthy'){
+    setBadge('HEALTHY','badge-ok');
+    showVerdict('✅ Candidate is healthy — deployment promoted to production','healthy');
+    document.getElementById('trigger-btn').disabled=false;
+    document.getElementById('demo-btn').disabled=false;
+    return;
+  }
+
+  if(event==='pipeline_complete'){
+    const ctx=data.context||{};
+    updateMetrics(ctx);
+    const ok=ctx.recovery_verified;
+    setBadge(ok?'REMEDIATED':'FAILED',ok?'badge-ok':'badge-error');
+    if(ok) showVerdict('🛡 Autonomous Rollback Complete — stable service fully recovered','remediated');
+    else   showVerdict('⚠ Remediation attempted — manual review recommended','error');
+    document.getElementById('trigger-btn').disabled=false;
+    document.getElementById('demo-btn').disabled=false;
+    return;
+  }
+
+  if(event==='pipeline_error'){
+    setBadge('ERROR','badge-error');
+    addLog(new Date().toLocaleTimeString(),'orchestrator','✗ '+data.error,'error');
+    document.getElementById('trigger-btn').disabled=false;
+    document.getElementById('demo-btn').disabled=false;
+    return;
+  }
+};
+
+// ── Trigger buttons ───────────────────────────────────────────────────────────
+async function triggerPipeline(){
+  document.getElementById('trigger-btn').disabled=true;
+  document.getElementById('demo-btn').disabled=true;
+  const r=await fetch('/run',{method:'POST'});
+  const j=await r.json();
+  if(j.status==='already_running'){
+    document.getElementById('trigger-btn').disabled=false;
+    document.getElementById('demo-btn').disabled=false;
+    alert('Pipeline is already running!');
+  }
+}
+
+async function triggerDemo(){
+  document.getElementById('trigger-btn').disabled=true;
+  document.getElementById('demo-btn').disabled=true;
+  const r=await fetch('/demo',{method:'POST'});
+  const j=await r.json();
+  if(j.status==='already_running'){
+    document.getElementById('trigger-btn').disabled=false;
+    document.getElementById('demo-btn').disabled=false;
+    alert('Pipeline is already running!');
+  }
+}
+
+// ── Poller toggle ─────────────────────────────────────────────────────────────
+let pollerActive=false;
+async function togglePoller(){
+  if(!pollerActive){
+    const r=await fetch('/poller/start',{method:'POST'});
+    const j=await r.json();
+    pollerActive=true;
+    document.getElementById('poller-pill').className='poller-pill active';
+    document.getElementById('poller-dot').className='poller-dot blink';
+    document.getElementById('poller-lbl').textContent='Poller: ON';
+    addLog(new Date().toLocaleTimeString(),'poller','Watching GitHub for pushes to candidate branch','ok');
+  } else {
+    await fetch('/poller/stop',{method:'POST'});
+    pollerActive=false;
+    document.getElementById('poller-pill').className='poller-pill';
+    document.getElementById('poller-dot').className='poller-dot';
+    document.getElementById('poller-lbl').textContent='Poller: OFF';
+    addLog(new Date().toLocaleTimeString(),'poller','Stopped watching GitHub','');
+  }
+}
+</script>
+</body>
+</html>

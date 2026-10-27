@@ -1,0 +1,38 @@
+[
+  {
+    "id": "INC-001",
+    "date": "2026-08-14",
+    "service": "payment-service",
+    "change_type": "config_rename",
+    "description": "PAYMENT_RETRY_COUNT renamed to PAYMENT_MAX_RETRIES. New code read old key, defaulted to 0, causing all failed payments to not retry. Elevated error rate detected after 3 minutes in canary.",
+    "affected_env_vars": ["PAYMENT_RETRY_COUNT", "PAYMENT_MAX_RETRIES"],
+    "detection_method": "canary_metrics",
+    "time_to_detect_minutes": 3,
+    "resolution": "rollback",
+    "user_impact": "none — caught in canary before promotion"
+  },
+  {
+    "id": "INC-002",
+    "date": "2026-07-02",
+    "service": "order-service",
+    "change_type": "timeout_unit_mismatch",
+    "description": "DB_TIMEOUT changed from milliseconds to seconds in new version. Code expected ms but env var was set in seconds. Result: 1ms effective timeout, all DB calls failed.",
+    "affected_env_vars": ["DB_TIMEOUT"],
+    "detection_method": "synthetic_canary",
+    "time_to_detect_minutes": 1,
+    "resolution": "rollback_and_fix",
+    "user_impact": "none — synthetic canary caught it"
+  },
+  {
+    "id": "INC-003",
+    "date": "2026-06-19",
+    "service": "payment-service",
+    "change_type": "missing_env_var",
+    "description": "New STRIPE_API_VERSION env var required by v3 but not added to deployment config. Service started but all Stripe API calls returned 400 Bad Request.",
+    "affected_env_vars": ["STRIPE_API_VERSION"],
+    "detection_method": "integration_test_failure",
+    "time_to_detect_minutes": 0,
+    "resolution": "block_release",
+    "user_impact": "none — blocked before deployment"
+  }
+]
