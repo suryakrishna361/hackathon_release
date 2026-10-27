@@ -49,7 +49,7 @@ def run_pipeline_async(push_info: dict):
 
         # Import here to avoid circular imports once orchestrator is built
         from pipeline.orchestrator import run_pipeline
-        run_pipeline(push_info)
+        run_pipeline(trigger_ref=push_info.get("branch", "candidate"))
 
     except ImportError:
         # Orchestrator not built yet — print a placeholder

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [candidate, master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test-payment-service:
+    name: Test Payment Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pytest fastapi httpx python-dotenv requests uvicorn pydantic==2.7.1
+
+      - name: Run tests
+        run: pytest services/payment-service/tests/ -v --tb=short
+
+  test-store-service:
+    name: Test Store Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pytest fastapi httpx python-dotenv requests uvicorn pydantic==2.7.1
+
+      - name: Run tests
+        run: pytest services/store-service/tests/ -v --tb=short

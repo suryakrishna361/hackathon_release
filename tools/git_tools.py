@@ -3,6 +3,7 @@ Git tools — used by Agent 1 (Change Analysis)
 These are the Python functions behind the tool definitions given to Claude.
 """
 import os
+import json
 import subprocess
 
 REPO_PATH = os.getenv("REPO_PATH", "C:/Users/VankadaraVenkataSuma/Desktop/Hackathon")
@@ -13,7 +14,7 @@ def read_git_diff(base_branch: str = "master", candidate_branch: str = "candidat
     try:
         result = subprocess.run(
             ["git", "diff", f"{base_branch}..{candidate_branch}"],
-            capture_output=True, text=True, cwd=REPO_PATH
+            capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=REPO_PATH
         )
         if result.returncode != 0:
             return f"Error reading diff: {result.stderr}"
@@ -27,7 +28,7 @@ def read_changed_files(base_branch: str = "master", candidate_branch: str = "can
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", f"{base_branch}..{candidate_branch}"],
-            capture_output=True, text=True, cwd=REPO_PATH
+            capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=REPO_PATH
         )
         return result.stdout.strip() or "No files changed."
     except Exception as e:
@@ -39,7 +40,7 @@ def read_commit_messages(branch: str = "candidate", count: int = 5) -> str:
     try:
         result = subprocess.run(
             ["git", "log", branch, f"-{count}", "--pretty=format:%h %s"],
-            capture_output=True, text=True, cwd=REPO_PATH
+            capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=REPO_PATH
         )
         return result.stdout.strip() or "No commits found."
     except Exception as e:
@@ -51,7 +52,7 @@ def read_file_contents(file_path: str, branch: str = "candidate") -> str:
     try:
         result = subprocess.run(
             ["git", "show", f"{branch}:{file_path}"],
-            capture_output=True, text=True, cwd=REPO_PATH
+            capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=REPO_PATH
         )
         if result.returncode != 0:
             return f"File not found on branch {branch}: {file_path}"
@@ -68,12 +69,12 @@ def compare_env_vars(service: str = "payment-service") -> str:
     try:
         v1 = subprocess.run(
             ["git", "show", f"master:services/{service}/main.py"],
-            capture_output=True, text=True, cwd=REPO_PATH
+            capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=REPO_PATH
         ).stdout
 
         v2 = subprocess.run(
             ["git", "show", f"candidate:services/{service}/main.py"],
-            capture_output=True, text=True, cwd=REPO_PATH
+            capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=REPO_PATH
         ).stdout
 
         # Extract os.getenv lines from both
@@ -100,3 +101,34 @@ def compare_env_vars(service: str = "payment-service") -> str:
         return "\n".join(result)
     except Exception as e:
         return f"Failed to compare env vars: {str(e)}"
+
+
+def search_incident_history(query: str) -> str:
+    """Search past incidents for patterns similar to the current change."""
+    incidents_file = os.path.join(REPO_PATH, "data", "incidents.json")
+    try:
+        with open(incidents_file) as f:
+            incidents = json.load(f)
+
+        query_lower = query.lower()
+        relevant = [
+            inc for inc in incidents
+            if any(query_lower in str(v).lower() for v in inc.values())
+        ]
+
+        if not relevant:
+            return f"No past incidents found matching '{query}'."
+
+        lines = [f"Found {len(relevant)} relevant past incident(s) for '{query}':\n"]
+        for inc in relevant:
+            lines.append(f"[{inc.get('id')}] {inc.get('date')} — {inc.get('service')}")
+            lines.append(f"  Type: {inc.get('change_type')}")
+            lines.append(f"  Description: {inc.get('description')}")
+            lines.append(f"  Resolution: {inc.get('resolution', inc.get('remediation', 'unknown'))}")
+            lines.append("")
+
+        return "\n".join(lines)
+    except FileNotFoundError:
+        return "No incident history file found."
+    except Exception as e:
+        return f"Failed to search incidents: {str(e)}"
