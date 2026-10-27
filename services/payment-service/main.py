@@ -1,6 +1,7 @@
 """
 payment-service v2 — CANDIDATE
 Refactored config keys to use shorter names for consistency.
+New feature: /refund endpoint for partial and full refunds.
 """
 import os
 import time
@@ -34,6 +35,12 @@ class PaymentRequest(BaseModel):
     customer_email: str
 
 
+class RefundRequest(BaseModel):
+    transaction_id: str
+    amount: float
+    reason: str = "customer_request"
+
+
 @app.get("/")
 def root():
     return {"service": "payment-service", "version": "v2", "timeout_ms": TIMEOUT_MS}
@@ -62,6 +69,34 @@ def process_payment(payment: PaymentRequest):
         "transaction_id": f"TXN-{int(time.time())}-{random.randint(1000, 9999)}",
         "amount_charged": payment.amount,
         "last4": payment.card_number[-4:],
+        "processing_time_ms": round(duration_ms, 2),
+    }
+
+
+@app.post("/refund")
+def process_refund(refund: RefundRequest):
+    start = time.time()
+    _total[0] += 1
+
+    # Same bug: TIMEOUT_MS is 0 — refunds also timeout
+    if TIMEOUT_MS == 0:
+        time.sleep(3.0)
+        duration_ms = (time.time() - start) * 1000
+        _latencies.append(duration_ms)
+        _errors[0] += 1
+        return {"success": False, "error": "Refund processor timeout", "timeout_ms": TIMEOUT_MS}
+
+    processing_time = random.uniform(0.10, 0.20)
+    time.sleep(processing_time)
+    duration_ms = (time.time() - start) * 1000
+    _latencies.append(duration_ms)
+
+    return {
+        "success": True,
+        "refund_id": f"REF-{int(time.time())}-{random.randint(1000, 9999)}",
+        "transaction_id": refund.transaction_id,
+        "amount_refunded": refund.amount,
+        "reason": refund.reason,
         "processing_time_ms": round(duration_ms, 2),
     }
 
