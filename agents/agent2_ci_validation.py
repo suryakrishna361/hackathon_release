@@ -153,14 +153,14 @@ def run(ctx: ReleaseContext) -> ReleaseContext:
 
     result = extract_json(raw)
 
-    ctx.tests_passed        = result.get("tests_passed", False)
-    ctx.config_compatible   = result.get("config_compatible", True)
-    ctx.missing_env_vars    = result.get("missing_env_vars", [])
-    ctx.renamed_env_vars    = result.get("renamed_env_vars", [])
-    ctx.validation_warnings = result.get("validation_warnings", [])
+    ctx.tests_passed                = result.get("tests_passed", False)
+    ctx.config_compatible           = result.get("config_compatible", True)
+    ctx.missing_env_vars            = result.get("missing_env_vars", [])
+    ctx.renamed_env_vars            = result.get("renamed_env_vars", [])
+    ctx.validation_warnings         = result.get("validation_warnings", [])
+    ctx.github_actions_conclusion   = result.get("github_actions_conclusion", "unknown")
 
-    gh_conclusion = result.get("github_actions_conclusion", "unknown")
-    ctx.log("agent2", f"GitHub Actions: {gh_conclusion} | Tests passed: {ctx.tests_passed} | Config compatible: {ctx.config_compatible}")
+    ctx.log("agent2", f"GitHub Actions: {ctx.github_actions_conclusion} | Tests passed: {ctx.tests_passed} | Config compatible: {ctx.config_compatible}")
     if ctx.validation_warnings:
         ctx.log("agent2", f"Warnings: {ctx.validation_warnings}", level="warn")
     return ctx

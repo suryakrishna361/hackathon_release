@@ -34,6 +34,7 @@ class ReleaseContext:
     renamed_env_vars: List[str] = field(default_factory=list)
     validation_warnings: List[str] = field(default_factory=list)
     validation_recommendation: str = ""  # block / guarded / proceed
+    github_actions_conclusion: str = ""  # success / failure / timeout / unknown
 
     # ── Agent 3: Rollout Decision ──
     rollout_strategy: str = "pending"    # blocked / synthetic_canary / canary / blue_green / full
@@ -75,46 +76,58 @@ class ReleaseContext:
     def log(self, agent: str, message: str, level: str = "info"):
         """Any agent can call this to record a decision or observation."""
         entry = {
+            "ts": time.strftime("%H:%M:%S"),
             "agent": agent,
             "message": message,
             "level": level,
             "timestamp": time.time(),
         }
         self.decision_log.append(entry)
-        # Also print to terminal so you can watch in real time
         icons = {"info": "→", "warning": "⚠", "action": "★", "error": "✗"}
         icon = icons.get(level, "→")
         print(f"  [{agent}] {icon} {message}")
 
     def to_dict(self) -> dict:
-        """Serialize for dashboard display or incident recording."""
+        """Serialize for dashboard display or incident recording. Flat keys match dashboard JS."""
         return {
-            "release_id": self.release_id,
-            "candidate_version": self.candidate_version,
-            "stable_version": self.stable_version,
-            "risk_level": self.risk_level,
-            "suspected_failure": self.suspected_failure,
-            "risk_reasoning": self.risk_reasoning,
-            "rollout_strategy": self.rollout_strategy,
-            "runtime": {
-                "stable_p95_ms": self.stable_p95_ms,
-                "candidate_p95_ms": self.candidate_p95_ms,
-                "stable_error_rate": self.stable_error_rate,
-                "candidate_error_rate": self.candidate_error_rate,
-                "synthetic_stable_success_rate": self.synthetic_stable_success_rate,
-                "synthetic_candidate_success_rate": self.synthetic_candidate_success_rate,
-            },
-            "diagnosis": {
-                "candidate_is_degrading": self.candidate_is_degrading,
-                "confidence": self.diagnosis_confidence,
-                "likely_cause": self.likely_cause,
-                "evidence": self.diagnosis_evidence,
-                "recommended_action": self.recommended_action,
-            },
-            "remediation": {
-                "action": self.remediation_taken,
-                "status": self.remediation_status,
-                "recovery_verified": self.recovery_verified,
-            },
-            "decision_log": self.decision_log,
+            # identity
+            "release_id":                   self.release_id,
+            "candidate_version":            self.candidate_version,
+            "stable_version":               self.stable_version,
+            "affected_services":            self.affected_services,
+            # agent 1
+            "risk_level":                   self.risk_level,
+            "suspected_failure":            self.suspected_failure,
+            "risk_confidence":              self.risk_confidence,
+            "risk_reasoning":               self.risk_reasoning,
+            # agent 2
+            "tests_passed":                 self.tests_passed,
+            "config_compatible":            self.config_compatible,
+            "validation_warnings":          self.validation_warnings,
+            "renamed_env_vars":             self.renamed_env_vars,
+            "missing_env_vars":             self.missing_env_vars,
+            "github_actions_conclusion":    self.github_actions_conclusion,
+            # agent 3
+            "rollout_strategy":             self.rollout_strategy,
+            "promotion_allowed":            self.promotion_allowed,
+            "strategy_reasoning":           self.strategy_reasoning,
+            # agent 4
+            "stable_p95_ms":                self.stable_p95_ms,
+            "candidate_p95_ms":             self.candidate_p95_ms,
+            "stable_error_rate":            self.stable_error_rate,
+            "candidate_error_rate":         self.candidate_error_rate,
+            "synthetic_success_rate_stable":    self.synthetic_stable_success_rate,
+            "synthetic_success_rate_candidate": self.synthetic_candidate_success_rate,
+            # agent 5
+            "candidate_degrading":          self.candidate_is_degrading,
+            "diagnosis_confidence":         self.diagnosis_confidence,
+            "likely_cause":                 self.likely_cause,
+            "diagnosis_evidence":           self.diagnosis_evidence,
+            "recommended_action":           self.recommended_action,
+            # agent 6
+            "remediation_taken":            self.remediation_taken,
+            "remediation_status":           self.remediation_status,
+            "recovery_verified":            self.recovery_verified,
+            # log
+            "decision_log":                 self.decision_log,
         }

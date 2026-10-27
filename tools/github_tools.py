@@ -61,7 +61,7 @@ def get_workflow_run_status(commit_sha: str) -> dict:
         return {"error": str(e)}
 
 
-def wait_for_workflow(commit_sha: str, timeout_seconds: int = 300) -> dict:
+def wait_for_workflow(commit_sha: str, timeout_seconds: int = 180) -> dict:
     """Poll every 10s until the workflow completes or timeout is reached."""
     start = time.time()
     while time.time() - start < timeout_seconds:
